@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Phan Chieu Man Hinh Receiver - 2K 16:9</title>
+  <link rel="stylesheet" href="receiver.css">
+
+  <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+  <script src="https://vjs.zencdn.net/8.10.0/video.js"></script>
+
+  <script type="text/javascript" src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+  <script src="config.js"></script>
+  <script src="video-processor.js"></script>
+</head>
+<body>
+
+  <!-- Canvas để xử lý crop và resize -->
+  <canvas id="processing-canvas" style="display: none;"></canvas>
+  
+  <!-- Video element với độ phân giải 2K -->
+  <video
+    id="receiver-video"
+    class="video-js vjs-big-play-centered"
+    controls
+    preload="auto"
+    width="2560"
+    height="1440"
+    data-setup='{}'>
+  </video>
+
+  <div id="waiting-screen">
+    <img src="logo.png" alt="App Logo">
+    <h1>Phan Chieu Man Hinh 2K</h1>
+    <p>Sẵn sàng để phản chiếu màn hình...</p>
+    <div class="info">
+      <p>Độ phân giải: 2560x1440 (2K)</p>
+      <p>Tỷ lệ: 16:9 (đã crop từ 21:9)</p>
+      <p>Cập nhật: 4 giây/lần</p>
+    </div>
+  </div>
+
+  <script>
+    const context = cast.framework.CastReceiverContext.getInstance();
+    const playerManager = context.getPlayerManager();
+    const videoElement = document.getElementById('receiver-video');
+    const videoPlayer = videojs('receiver-video');
+    const waitingScreen = document.getElementById('waiting-screen');
+    
+    // Khởi tạo VideoProcessor
+    const videoProcessor = new VideoProcessor();
+
+    // Lắng nghe yêu cầu tải media từ điện thoại
+    playerManager.setMessageInterceptor(
+        cast.framework.messages.MessageType.LOAD,
+        loadRequestData => {
+            console.log('LOAD request received:', loadRequestData);
+
+            // Nếu là một luồng stream
+            if (loadRequestData.media && loadRequestData.media.contentUrl) {
+                const streamUrl = loadRequestData.media.contentUrl;
+                console.log('Streaming URL:', streamUrl);
+
+                waitingScreen.style.display = 'none';
+                videoElement.style.display = 'block';
+
+                // Đặt nguồn video và bắt đầu xử lý
+                videoPlayer.src({
+                    src: streamUrl,
+                    type: 'application/x-rtsp'
+                });
+                
+                // Bắt đầu xử lý video khi video sẵn sàng
+                videoElement.addEventListener('loadedmetadata', () => {
+                  console.log('Video loaded - Original size:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                  
+                  // Bắt đầu xử lý video
+                  const processedStream = videoProcessor.startProcessing(videoElement);
+                  
+                  // Hiển thị stream đã xử lý
+                  if (processedStream) {
+                    videoPlayer.src({
+                      src: URL.createObjectURL(processedStream),
+                      type: 'video/webm'
+                    });
+                    videoPlayer.play();
+                  }
+                });
+                
+                videoPlayer.play();
+
+                return null;
+            }
+            return loadRequestData;
+        }
+    );
+
+    // Dọn dẹp khi kết thúc
+    playerManager.addEventListener(cast.framework.events.EventType.REQUEST_STOP, () => {
+      videoProcessor.stopProcessing();
+    });
+
+    context.start();
+  </script>
+</body>
+</html>
