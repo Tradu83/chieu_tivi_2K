@@ -1,233 +1,69 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
+    <title>Screen Mirror Receiver</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug Info</title>
     <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            background: #000;
-            color: white;
-            font-family: monospace;
-            font-size: 14px;
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            overflow: hidden; background-color: #00008B;
         }
-        
-        .container {
-            display: flex;
-            gap: 20px;
+        img {
+            width: 100vw;
+            height: 100vh;
+            object-fit: contain;
         }
-        
-        .image-container {
-            flex: 1;
+        #status-text {
+            position: absolute;
+            top: 45%;
+            width: 100%;
             text-align: center;
-        }
-        
-        .screen-image {
-            max-width: 100%;
-            max-height: 60vh;
-            border: 2px solid #333;
-        }
-        
-        .info-panel {
-            flex: 1;
-            background: #111;
-            padding: 20px;
-            border-radius: 10px;
-        }
-        
-        .info-item {
-            margin: 10px 0;
-            padding: 5px;
-            background: #222;
-            border-radius: 5px;
-        }
-        
-        .status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #333;
-            padding: 10px;
-            border-radius: 5px;
+            font-size: 36px;
+            font-weight: bold;
+            color: #FFFF00;
+            text-shadow: 2px 2px 4px #000;
         }
     </style>
 </head>
 <body>
-    <div class="status" id="status">Đang kết nối...</div>
+    <div id="status-text">Chờ kết nối...</div>
+    <img id="screen-img" />
     
-    <div class="container">
-        <div class="image-container">
-            <img id="screenImage" class="screen-image" alt="Màn hình điện thoại" style="display: none;">
-            <div id="noImage">Chưa có ảnh</div>
-        </div>
-        
-        <div class="info-panel">
-            <h3>Thông Tin Ảnh</h3>
-            <div class="info-item">
-                <strong>Kích thước gốc:</strong> <span id="naturalSize">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Kích thước hiển thị:</strong> <span id="displaySize">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Tỷ lệ khung hình:</strong> <span id="aspectRatio">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Chế độ:</strong> <span id="mode">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Thời gian cập nhật:</strong> <span id="updateTime">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Kích thước file:</strong> <span id="fileSize">-</span>
-            </div>
-            
-            <h3>Thông Tin Màn Hình</h3>
-            <div class="info-item">
-                <strong>Màn hình TV:</strong> <span id="tvSize">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Tỷ lệ TV:</strong> <span id="tvRatio">-</span>
-            </div>
-            <div class="info-item">
-                <strong>Độ phân giải:</strong> <span id="resolution">-</span>
-            </div>
-        </div>
-    </div>
-
+    <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
     <script>
-        const imageElement = document.getElementById('screenImage');
-        const statusElement = document.getElementById('status');
-        const noImageElement = document.getElementById('noImage');
-        
-        // Các element thông tin
-        const naturalSizeElement = document.getElementById('naturalSize');
-        const displaySizeElement = document.getElementById('displaySize');
-        const aspectRatioElement = document.getElementById('aspectRatio');
-        const modeElement = document.getElementById('mode');
-        const updateTimeElement = document.getElementById('updateTime');
-        const fileSizeElement = document.getElementById('fileSize');
-        const tvSizeElement = document.getElementById('tvSize');
-        const tvRatioElement = document.getElementById('tvRatio');
-        const resolutionElement = document.getElementById('resolution');
-        
-        let serverUrl = '';
-        let lastUpdateTime = Date.now();
-        
-        // Cập nhật thông tin màn hình
-        function updateScreenInfo() {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            const ratio = (width / height).toFixed(2);
-            
-            tvSizeElement.textContent = `${width} x ${height}`;
-            tvRatioElement.textContent = ratio;
-            resolutionElement.textContent = `${screen.width} x ${screen.height}`;
-        }
-        
-        // Tự động phát hiện server
-        function detectServer() {
-            const hostname = window.location.hostname || 'localhost';
-            const ports = [8088, 8080, 3000];
-            
-            for (const port of ports) {
-                const testUrl = `http://${hostname}:${port}`;
-                fetch(testUrl, { method: 'HEAD' })
-                    .then(response => {
-                        if (response.ok) {
-                            serverUrl = testUrl;
-                            updateStatus('Đã kết nối');
-                            startStreaming();
-                            return;
-                        }
-                    })
-                    .catch(() => {
-                        console.log(`Không thể kết nối đến ${testUrl}`);
-                    });
-            }
-        }
-        
-        function startStreaming() {
-            loadNextFrame();
-        }
-        
-        function loadNextFrame() {
-            if (!serverUrl) return;
-            
-            const timestamp = Date.now();
-            const imageUrl = `${serverUrl}?t=${timestamp}`;
-            
-            imageElement.src = imageUrl;
-            
-            setTimeout(() => {
-                loadNextFrame();
-            }, 4000);
-        }
-        
-        imageElement.addEventListener('load', () => {
-            updateStatus('Đang phản chiếu');
-            imageElement.style.display = 'block';
-            noImageElement.style.display = 'none';
-            
-            // Cập nhật thông tin
-            const naturalWidth = imageElement.naturalWidth;
-            const naturalHeight = imageElement.naturalHeight;
-            const displayWidth = imageElement.offsetWidth;
-            const displayHeight = imageElement.offsetHeight;
-            const ratio = (naturalWidth / naturalHeight).toFixed(2);
-            
-            naturalSizeElement.textContent = `${naturalWidth} x ${naturalHeight}`;
-            displaySizeElement.textContent = `${displayWidth} x ${displayHeight}`;
-            aspectRatioElement.textContent = ratio;
-            
-                         // Xác định chế độ
-             if (ratio > 1.5) {
-                 modeElement.textContent = 'Landscape (OPTIMIZED for TV: 145cm x 83cm)';
-             } else {
-                 modeElement.textContent = 'Portrait';
-             }
-            
-            // Cập nhật thời gian
-            const now = Date.now();
-            const timeDiff = now - lastUpdateTime;
-            updateTimeElement.textContent = `${timeDiff}ms trước`;
-            lastUpdateTime = now;
-            
-            // Ước tính kích thước file
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = naturalWidth;
-            canvas.height = naturalHeight;
-            ctx.drawImage(imageElement, 0, 0);
-            
-            try {
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                const sizeInBytes = Math.round((dataUrl.length * 3) / 4);
-                const sizeInKB = (sizeInBytes / 1024).toFixed(1);
-                fileSizeElement.textContent = `${sizeInKB} KB`;
-            } catch (e) {
-                fileSizeElement.textContent = 'Không xác định';
+        const CUSTOM_NAMESPACE = "urn:x-cast:com.tranduyen.chieuphone.custom";
+        const context = cast.framework.CastReceiverContext.getInstance();
+        const screenImg = document.getElementById('screen-img');
+        const statusText = document.getElementById('status-text');
+        let refreshInterval = null;
+
+        context.addCustomMessageListener(CUSTOM_NAMESPACE, (event) => {
+            const data = event.data;
+            if (data && data.type === 'START_STREAM') {
+                console.log('Received START_STREAM command with URL:', data.url);
+                statusText.style.display = 'none'; // Ẩn chữ đi
+                
+                // Dừng interval cũ nếu có
+                if (refreshInterval) {
+                    clearInterval(refreshInterval);
+                }
+                
+                // Bắt đầu làm mới ảnh sau mỗi 4 giây
+                refreshInterval = setInterval(() => {
+                    // Thêm tham số ngẫu nhiên để tránh trình duyệt cache ảnh cũ
+                    screenImg.src = data.url + '?t=' + new Date().getTime();
+                }, 4000); // 4000 mili-giây = 4 giây
             }
         });
         
-        imageElement.addEventListener('error', () => {
-            updateStatus('Lỗi kết nối');
-            imageElement.style.display = 'none';
-            noImageElement.style.display = 'block';
+        context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, () => {
+            if (refreshInterval) clearInterval(refreshInterval);
+            window.close();
         });
-        
-        function updateStatus(message) {
-            statusElement.textContent = message;
-        }
-        
-        // Khởi tạo
-        updateScreenInfo();
-        detectServer();
-        
-        // Cập nhật thông tin màn hình khi resize
-        window.addEventListener('resize', updateScreenInfo);
+
+        const options = new cast.framework.CastReceiverOptions();
+        options.disableIdleTimeout = true;
+        context.start(options);
     </script>
 </body>
 </html>
